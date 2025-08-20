@@ -1,0 +1,479 @@
+<!DOCTYPE html>
+<html lang="en" class="scroll-smooth">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Spotify Alter Ego — Local Player</title>
+  <!-- Tailwind via CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <meta name="color-scheme" content="dark">
+  <style>
+    :root{
+      --brand:#1DB954; /* Spotify-ish green */
+      --brand-2:#18a84b;
+      --bg-900:#0f1115;
+      --bg-800:#131722;
+      --bg-700:#181c28;
+      --text-100:#e8f0f2;
+      --text-400:#9aa7b2;
+    }
+    body{background:linear-gradient(180deg,var(--bg-900) 0%, #0b0d12 100%);}  
+    /* Scrollbar */
+    ::-webkit-scrollbar{height:10px;width:10px}
+    ::-webkit-scrollbar-thumb{background:#2a3344;border-radius:9999px}
+    ::-webkit-scrollbar-track{background:transparent}
+    /* Range inputs */
+    input[type=range]{
+      -webkit-appearance:none;appearance:none;width:100%;height:4px;background:#2b3445;border-radius:9999px;outline:none
+    }
+    input[type=range]::-webkit-slider-thumb{
+      -webkit-appearance:none;appearance:none;width:14px;height:14px;background:var(--brand);border-radius:50%;cursor:pointer;border:2px solid #0b0f16
+    }
+    input[type=range]::-moz-range-thumb{width:14px;height:14px;background:var(--brand);border:none;border-radius:50%;cursor:pointer}
+    .btn{ @apply px-3 py-2 rounded-2xl bg-[#1a2230] hover:bg-[#1f2a3b] active:scale-[.98] transition shadow-sm disabled:opacity-40 disabled:cursor-not-allowed;}
+    .icon-btn{ @apply p-2 rounded-xl bg-[#1a2230] hover:bg-[#1f2a3b] transition shadow-sm; }
+    .chip{ @apply text-xs px-2 py-1 rounded-full bg-[#192232] text-slate-300; }
+  </style>
+</head>
+<body class="text-[var(--text-100)] min-h-screen">
+  <div class="max-w-[1200px] mx-auto p-4 sm:p-6">
+    <!-- Header -->
+    <header class="flex items-center justify-between gap-4 mb-4">
+      <div class="flex items-center gap-3">
+        <div class="w-10 h-10 rounded-2xl" style="background:radial-gradient(80% 80% at 30% 30%, var(--brand) 0%, #0d5a2d 70%, transparent 71%), linear-gradient(135deg, #0a1623, #0f1a2a); box-shadow:0 8px 24px rgba(29,185,84,.18);"></div>
+        <div>
+          <h1 class="text-xl sm:text-2xl font-bold tracking-tight">Spotify Alter Ego</h1>
+          <p class="text-xs text-[var(--text-400)] -mt-0.5">Local music player — plays files from your repo</p>
+        </div>
+      </div>
+      <div class="flex items-center gap-2">
+        <button id="btnOpenFiles" class="btn text-sm">+ Add local files</button>
+        <a href="#" id="btnHelp" class="icon-btn" title="Help / Shortcuts" aria-label="Help">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-5 h-5"><path d="M12 2a10 10 0 100 20 10 10 0 000-20zm.01 14.25a1.25 1.25 0 110 2.5 1.25 1.25 0 010-2.5zM12 6.75a3.25 3.25 0 00-3.25 3.25.75.75 0 101.5 0 1.75 1.75 0 113.09 1.1c-.42.54-1.09.96-1.67 1.33-.74.46-1.42.88-1.72 1.57-.15.34-.23.74-.23 1.25v.25a.75.75 0 001.5 0v-.25c0-.27.05-.43.08-.51.12-.28.56-.56 1.21-.97.76-.47 1.7-1.04 2.32-1.84A3.24 3.24 0 0012 6.75z"/></svg>
+        </a>
+      </div>
+    </header>
+
+    <!-- Shell -->
+    <div class="grid grid-cols-1 lg:grid-cols-[320px,1fr] gap-4">
+      <!-- Sidebar / Playlist -->
+      <aside class="bg-[var(--bg-800)] rounded-2xl p-3 sm:p-4 shadow-md">
+        <div class="flex items-center gap-2 mb-3">
+          <input id="search" type="text" placeholder="Search tracks…" class="w-full px-3 py-2 rounded-xl bg-[#0f1420] text-sm outline-none focus:ring-2 focus:ring-[var(--brand)]" />
+          <button id="btnClearSearch" class="icon-btn" title="Clear search">✕</button>
+        </div>
+        <div class="flex items-center gap-2 mb-3 text-xs">
+          <span class="chip" id="chipCount">0 tracks</span>
+          <button id="btnShuffleNow" class="chip hover:opacity-80">Shuffle</button>
+          <button id="btnResetOrder" class="chip hover:opacity-80">Reset order</button>
+        </div>
+        <ul id="playlist" class="space-y-1 max-h-[62vh] overflow-auto pr-1" aria-label="Playlist"></ul>
+      </aside>
+
+      <!-- Main Player -->
+      <main class="bg-[var(--bg-800)] rounded-2xl p-4 sm:p-6 shadow-md">
+        <div class="grid grid-cols-1 sm:grid-cols-[120px,1fr] gap-4">
+          <!-- Cover -->
+          <div class="w-full h-[120px] sm:h-full sm:aspect-square rounded-2xl bg-[#0b1220] flex items-center justify-center select-none" id="coverBox">
+            <div id="cover" class="w-[72%] h-[72%] rounded-xl" style="background:conic-gradient(from 180deg, #0a1a2a, #14263a, #0a1a2a); box-shadow:0 12px 24px #000 inset, 0 10px 30px rgba(0,0,0,.35)"></div>
+          </div>
+          <!-- Info + Controls -->
+          <div>
+            <div class="mb-4">
+              <div class="text-sm text-[var(--text-400)]" id="trackArtist">—</div>
+              <h2 class="text-2xl sm:text-3xl font-extrabold tracking-tight" id="trackTitle">No track</h2>
+            </div>
+
+            <!-- Progress -->
+            <div class="mb-3">
+              <input id="seek" type="range" min="0" max="100" value="0" step="0.1">
+              <div class="flex justify-between text-xs text-[var(--text-400)] mt-1">
+                <span id="currentTime">0:00</span>
+                <span id="duration">0:00</span>
+              </div>
+            </div>
+
+            <!-- Controls Row -->
+            <div class="flex items-center gap-2 flex-wrap">
+              <button id="btnPrev" class="icon-btn" title="Previous">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-6 h-6"><path d="M6.75 5a.75.75 0 00-1.5 0v14a.75.75 0 001.5 0V5zM20 5.75a.75.75 0 00-1.138-.643l-9.5 5.75a.75.75 0 000 1.286l9.5 5.75A.75.75 0 0020 17.25V5.75z"/></svg>
+              </button>
+              <button id="btnPlay" class="btn font-semibold" title="Play/Pause">Play</button>
+              <button id="btnNext" class="icon-btn" title="Next">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-6 h-6"><path d="M17.25 19a.75.75 0 001.5 0V5a.75.75 0 00-1.5 0v14zM4 18.25a.75.75 0 001.138.643l9.5-5.75a.75.75 0 000-1.286l-9.5-5.75A.75.75 0 004 6.75v11.5z"/></svg>
+              </button>
+
+              <div class="flex items-center gap-2 ml-2">
+                <button id="btnShuffle" class="icon-btn" title="Shuffle (S)">🔀</button>
+                <button id="btnRepeat" class="icon-btn" title="Repeat (R)">🔁</button>
+                <button id="btnMute" class="icon-btn" title="Mute (M)">🔈</button>
+              </div>
+
+              <div class="flex items-center gap-2 ml-auto w-full sm:w-auto">
+                <input id="volume" type="range" min="0" max="1" step="0.01" class="w-full sm:w-40"/>
+                <span id="volumeLabel" class="text-xs text-[var(--text-400)] w-10 text-right">100%</span>
+              </div>
+            </div>
+
+            <!-- Tips -->
+            <div class="mt-4 text-xs text-[var(--text-400)] leading-relaxed" id="tips">
+              <span class="chip">Space</span> Play/Pause · <span class="chip">←/→</span> Seek · <span class="chip">S</span> Shuffle · <span class="chip">R</span> Repeat · <span class="chip">M</span> Mute
+            </div>
+          </div>
+        </div>
+      </main>
+    </div>
+
+    <!-- Footer -->
+    <footer class="mt-6 text-center text-xs text-[var(--text-400)]">
+      <span>Files load from <code class="px-1 py-0.5 rounded bg-[#0e1420]">/songs/</code> in this repo or via local picker.</span>
+    </footer>
+  </div>
+
+  <!-- Hidden Inputs -->
+  <input id="fileInput" type="file" accept="audio/*" multiple class="hidden"/>
+
+  <!-- Audio Element -->
+  <audio id="audio"></audio>
+
+  <script>
+  // === CONFIG ==============================================================
+  // 1) Place your audio files in /songs/ and add them to MANIFEST, OR create
+  //    /songs/manifest.json with the same array format to auto-load.
+  // 2) Supported fields: src (required), title, artist, album, cover (optional)
+  const MANIFEST = [
+    // Example entries — replace with your own
+    // { src: 'songs/lofi-1.mp3', title: 'Night Code', artist: 'Hamza-kun', album: 'Alter Ego', cover: 'songs/lofi-1.jpg' },
+    // { src: 'songs/lofi-2.mp3', title: 'Neon City', artist: 'Hamza-kun', album: 'Alter Ego' },
+  ];
+
+  const LS = {
+    ORDER: 'alterego.order',
+    INDEX: 'alterego.index',
+    TIME:  'alterego.time',
+    VOL:   'alterego.volume',
+    MUTE:  'alterego.muted',
+    REP:   'alterego.repeat', // off|all|one
+    SHUF:  'alterego.shuffle',
+    LOCAL: 'alterego.localFiles' // persisted names for local picks
+  };
+
+  // Repeat/Shuffle modes
+  const Repeat = { OFF:'off', ALL:'all', ONE:'one' };
+
+  // State
+  let tracks = [];      // full catalog
+  let view = [];        // filtered/sorted order (holds indices into tracks)
+  let current = 0;      // index into view
+  let draggingIndex = null;
+
+  // DOM
+  const $ = s => document.querySelector(s);
+  const playlistEl = $('#playlist');
+  const audio = $('#audio');
+  const seek = $('#seek');
+  const volume = $('#volume');
+  const volumeLabel = $('#volumeLabel');
+  const btnPlay = $('#btnPlay');
+  const btnPrev = $('#btnPrev');
+  const btnNext = $('#btnNext');
+  const btnShuffle = $('#btnShuffle');
+  const btnRepeat = $('#btnRepeat');
+  const btnMute = $('#btnMute');
+  const btnShuffleNow = $('#btnShuffleNow');
+  const btnResetOrder = $('#btnResetOrder');
+  const fileInput = $('#fileInput');
+  const btnOpenFiles = $('#btnOpenFiles');
+  const search = $('#search');
+  const btnClearSearch = $('#btnClearSearch');
+  const chipCount = $('#chipCount');
+  const trackTitle = $('#trackTitle');
+  const trackArtist = $('#trackArtist');
+  const currentTimeEl = $('#currentTime');
+  const durationEl = $('#duration');
+
+  // Helpers
+  const fmtTime = (s)=>{
+    if (!isFinite(s) || s<0) return '0:00';
+    const m = Math.floor(s/60), r = Math.floor(s%60);
+    return m+":"+(r<10?'0':'')+r;
+  }
+
+  function parseName(filePath){
+    const base = filePath.split('/').pop().replace(/\.[^/.]+$/, '')
+    const parts = base.split(' - ');
+    if (parts.length >= 2) return {artist: parts[0], title: parts.slice(1).join(' - ')};
+    return {artist: 'Unknown', title: base};
+  }
+
+  function saveOrder(){ localStorage.setItem(LS.ORDER, JSON.stringify(view.map(i=>tracks[i].id))); }
+  function loadOrder(){ try{ return JSON.parse(localStorage.getItem(LS.ORDER)||'null'); }catch{ return null } }
+
+  function persistBasics(){
+    localStorage.setItem(LS.INDEX, String(current));
+    localStorage.setItem(LS.TIME, String(audio.currentTime||0));
+    localStorage.setItem(LS.VOL, String(audio.volume));
+    localStorage.setItem(LS.MUTE, String(audio.muted));
+  }
+
+  function restoreBasics(){
+    const vi = parseInt(localStorage.getItem(LS.INDEX));
+    const t = parseFloat(localStorage.getItem(LS.TIME));
+    const vol = parseFloat(localStorage.getItem(LS.VOL));
+    const muted = localStorage.getItem(LS.MUTE) === 'true';
+    if (!isNaN(vi)) current = Math.max(0, Math.min(vi, view.length-1));
+    if (!isNaN(t)) audio.currentTime = t;
+    if (!isNaN(vol)) audio.volume = vol;
+    audio.muted = muted;
+  }
+
+  function setRepeat(mode){
+    localStorage.setItem(LS.REP, mode);
+    btnRepeat.textContent = mode===Repeat.OFF? '🔁' : (mode===Repeat.ALL? '🔂 All' : '🔂 One');
+    btnRepeat.classList.toggle('ring-2', mode!==Repeat.OFF);
+    btnRepeat.classList.toggle('ring-[var(--brand)]', mode!==Repeat.OFF);
+  }
+  function getRepeat(){ return localStorage.getItem(LS.REP) || Repeat.OFF }
+
+  function setShuffle(on){
+    localStorage.setItem(LS.SHUF, on?'1':'0');
+    btnShuffle.classList.toggle('ring-2', !!on);
+    btnShuffle.classList.toggle('ring-[var(--brand)]', !!on);
+  }
+  function isShuffle(){ return localStorage.getItem(LS.SHUF) === '1' }
+
+  function setVolumeUI(){ volume.value = audio.volume; volumeLabel.textContent = Math.round(audio.volume*100)+'%'; btnMute.textContent = audio.muted? '🔇' : '🔈'; }
+
+  // Rendering
+  function renderPlaylist(){
+    playlistEl.innerHTML = '';
+    chipCount.textContent = `${view.length} ${view.length===1?'track':'tracks'}`;
+    view.forEach((idx,vi)=>{
+      const t = tracks[idx];
+      const item = document.createElement('li');
+      item.className = 'group flex items-center gap-3 p-2 rounded-xl hover:bg-[#121a28] border border-transparent hover:border-[#1f2a3b] cursor-pointer select-none';
+      item.setAttribute('draggable','true');
+      item.dataset.vi = vi;
+      item.innerHTML = `
+        <div class="w-10 h-10 rounded-lg bg-[#0b1220] grid place-items-center text-sm text-slate-300">${vi+1}</div>
+        <div class="min-w-0 flex-1">
+          <div class="text-sm font-semibold truncate">${t.title}</div>
+          <div class="text-xs text-slate-400 truncate">${t.artist || 'Unknown'}</div>
+        </div>
+        <button class="opacity-0 group-hover:opacity-100 icon-btn" title="Play">▶</button>
+      `;
+      item.addEventListener('click', e=>{ if (e.target.tagName==='BUTTON' || e.currentTarget){ playAt(vi) }});
+      // drag
+      item.addEventListener('dragstart', ()=>{ draggingIndex = vi; item.classList.add('opacity-60') });
+      item.addEventListener('dragend', ()=>{ draggingIndex = null; item.classList.remove('opacity-60') });
+      item.addEventListener('dragover', e=>{ e.preventDefault() });
+      item.addEventListener('drop', e=>{
+        e.preventDefault();
+        const targetVi = parseInt(item.dataset.vi);
+        if (isNaN(draggingIndex) || draggingIndex===null) return;
+        const moved = view.splice(draggingIndex,1)[0];
+        view.splice(targetVi,0,moved);
+        saveOrder();
+        renderPlaylist();
+      });
+      playlistEl.appendChild(item);
+    });
+  }
+
+  function highlightCurrent(){
+    [...playlistEl.children].forEach((li,i)=>{
+      li.classList.toggle('ring-2', i===current);
+      li.classList.toggle('ring-[var(--brand)]', i===current);
+      li.querySelector('div').textContent = i===current? '♪' : (i+1);
+    });
+  }
+
+  // Loading catalog
+  async function loadCatalog(){
+    let list = [...MANIFEST];
+    // Try to pull /songs/manifest.json if present
+    try{
+      const res = await fetch('songs/manifest.json', {cache:'no-store'});
+      if (res.ok){ const json = await res.json(); if (Array.isArray(json)) list = json; }
+    }catch(e){ /* ignore if not found */ }
+
+    // Restore any previously added local files
+    const localMeta = JSON.parse(localStorage.getItem(LS.LOCAL)||'[]');
+
+    tracks = list.concat(localMeta).map((t,i)=>{
+      const meta = {...t};
+      meta.id = t.id || crypto.randomUUID();
+      if (!meta.title || !meta.artist){
+        const guess = parseName(meta.src||meta.name||'Track');
+        meta.title = meta.title || guess.title;
+        meta.artist = meta.artist || guess.artist;
+      }
+      return meta;
+    });
+
+    // Build initial view with saved custom order if available
+    const savedOrder = loadOrder();
+    if (savedOrder && Array.isArray(savedOrder)){
+      const idToIndex = new Map(tracks.map((t,i)=>[t.id,i]));
+      const ordered = savedOrder.map(id=>idToIndex.get(id)).filter(i=>i!==undefined);
+      const missing = tracks.map((_,i)=>i).filter(i=>!ordered.includes(i));
+      view = ordered.concat(missing);
+    } else {
+      view = tracks.map((_,i)=>i);
+    }
+
+    renderPlaylist();
+  }
+
+  // Core playback
+  function use(vi){
+    current = Math.max(0, Math.min(vi, view.length-1));
+    const t = tracks[view[current]];
+    if (!t) return;
+    audio.src = t.src || t.blobUrl;
+    audio.play().catch(()=>{/* user gesture might be required */});
+    trackTitle.textContent = t.title || 'Unknown Title';
+    trackArtist.textContent = t.artist || 'Unknown Artist';
+    document.title = `${t.title} — Spotify Alter Ego`;
+    // Media Session
+    if ('mediaSession' in navigator){
+      navigator.mediaSession.metadata = new MediaMetadata({
+        title: t.title, artist: t.artist || '', album: t.album || '', artwork: t.cover? [{src:t.cover,sizes:'512x512',type:'image/jpeg'}] : []
+      });
+    }
+    highlightCurrent();
+    persistBasics();
+  }
+
+  function next(){
+    const rep = getRepeat();
+    if (rep===Repeat.ONE) return use(current); // restart same
+    if (isShuffle()){
+      current = Math.floor(Math.random()*view.length);
+      return use(current);
+    }
+    if (current < view.length-1){ use(current+1) }
+    else if (rep===Repeat.ALL){ use(0) }
+  }
+  function prev(){ if (audio.currentTime>3) { audio.currentTime = 0; } else { use(Math.max(0,current-1)) } }
+
+  function playAt(vi){ use(vi); }
+
+  // Search filter
+  function applyFilter(){
+    const q = search.value.toLowerCase().trim();
+    if (!q){ renderPlaylist(); highlightCurrent(); return; }
+    const matches = [];
+    tracks.forEach((t,i)=>{
+      const s = `${t.title} ${t.artist} ${t.album||''}`.toLowerCase();
+      if (s.includes(q)) matches.push(i);
+    });
+    view = matches;
+    renderPlaylist();
+  }
+
+  // Local file picker (File System Access)
+  function openLocalFiles(){ fileInput.click(); }
+  fileInput.addEventListener('change', async (e)=>{
+    const files = [...e.target.files];
+    const newMeta = [];
+    for (const f of files){
+      const url = URL.createObjectURL(f);
+      const guess = parseName(f.name);
+      const meta = { id: crypto.randomUUID(), src: url, blobUrl:url, title: guess.title, artist: guess.artist, album:'Local' };
+      tracks.push(meta);
+      newMeta.push({ id: meta.id, name: f.name, title: meta.title, artist: meta.artist, album: meta.album, src: meta.src, blobUrl: meta.blobUrl });
+    }
+    // append to view
+    const base = view.length; const more = Array.from({length:newMeta.length},(_,k)=>tracks.length - newMeta.length + k);
+    view = view.concat(more);
+    // persist minimal data for session restore
+    const prev = JSON.parse(localStorage.getItem(LS.LOCAL)||'[]');
+    localStorage.setItem(LS.LOCAL, JSON.stringify(prev.concat(newMeta)));
+    renderPlaylist();
+    if (files.length) use(view.length - more.length); // start first of new batch
+  });
+
+  // Events
+  audio.addEventListener('timeupdate', ()=>{
+    seek.max = audio.duration || 100; // duration might be NaN initially
+    seek.value = audio.currentTime || 0;
+    currentTimeEl.textContent = fmtTime(audio.currentTime);
+    durationEl.textContent = fmtTime(audio.duration);
+  });
+  audio.addEventListener('ended', next);
+
+  seek.addEventListener('input', ()=>{ audio.currentTime = parseFloat(seek.value) || 0; });
+
+  btnPlay.addEventListener('click', ()=>{ if (audio.paused) { audio.play(); btnPlay.textContent='Pause'; } else { audio.pause(); btnPlay.textContent='Play'; } });
+  audio.addEventListener('play', ()=>{ btnPlay.textContent='Pause'; });
+  audio.addEventListener('pause', ()=>{ btnPlay.textContent='Play'; });
+
+  btnPrev.addEventListener('click', prev);
+  btnNext.addEventListener('click', next);
+
+  btnShuffle.addEventListener('click', ()=>{ setShuffle(!isShuffle()); });
+  btnShuffleNow.addEventListener('click', ()=>{ setShuffle(true); current = Math.floor(Math.random()*view.length); use(current); });
+  btnResetOrder.addEventListener('click', ()=>{ view = tracks.map((_,i)=>i); saveOrder(); renderPlaylist(); highlightCurrent(); });
+
+  btnRepeat.addEventListener('click', ()=>{
+    const m = getRepeat();
+    setRepeat(m===Repeat.OFF? Repeat.ALL : m===Repeat.ALL? Repeat.ONE : Repeat.OFF);
+  });
+
+  btnMute.addEventListener('click', ()=>{ audio.muted = !audio.muted; setVolumeUI(); persistBasics(); });
+  volume.addEventListener('input', ()=>{ audio.volume = parseFloat(volume.value); setVolumeUI(); persistBasics(); });
+
+  // Keyboard shortcuts
+  window.addEventListener('keydown', (e)=>{
+    if (['INPUT','TEXTAREA'].includes(e.target.tagName)) return;
+    if (e.code==='Space'){ e.preventDefault(); btnPlay.click(); }
+    if (e.code==='ArrowRight'){ audio.currentTime = Math.min((audio.currentTime||0)+5, audio.duration||1e9); }
+    if (e.code==='ArrowLeft'){ audio.currentTime = Math.max((audio.currentTime||0)-5, 0); }
+    if (e.key==='s' || e.key==='S'){ btnShuffle.click(); }
+    if (e.key==='r' || e.key==='R'){ btnRepeat.click(); }
+    if (e.key==='m' || e.key==='M'){ btnMute.click(); }
+  });
+
+  // Playlist click handlers are attached per-item in renderPlaylist()
+
+  // Search
+  search.addEventListener('input', applyFilter);
+  btnClearSearch.addEventListener('click', ()=>{ search.value=''; view = tracks.map((_,i)=>i); renderPlaylist(); highlightCurrent(); });
+
+  // Help
+  $('#btnHelp').addEventListener('click', (e)=>{
+    e.preventDefault();
+    alert(`Shortcuts:\n\nSpace: Play/Pause\n←/→: Seek 5s\nS: Toggle Shuffle\nR: Cycle Repeat (off → all → one)\nM: Mute/Unmute`);
+  });
+
+  // Media Session actions
+  if ('mediaSession' in navigator){
+    navigator.mediaSession.setActionHandler('play', ()=>audio.play());
+    navigator.mediaSession.setActionHandler('pause', ()=>audio.pause());
+    navigator.mediaSession.setActionHandler('previoustrack', prev);
+    navigator.mediaSession.setActionHandler('nexttrack', next);
+    navigator.mediaSession.setActionHandler('seekto', (d)=>{ if (d.fastSeek && 'fastSeek' in audio) audio.fastSeek(d.seekTime); else audio.currentTime = d.seekTime; });
+  }
+
+  // Wire buttons
+  btnOpenFiles.addEventListener('click', openLocalFiles);
+
+  // Boot
+  (async function init(){
+    await loadCatalog();
+    // default audio volume
+    audio.volume = 1.0; setVolumeUI();
+    // restore modes
+    setRepeat(getRepeat());
+    setShuffle(isShuffle());
+    // default list -> pick 1st if exists
+    if (view.length){ use(0); }
+    // Try restore position *after* first metadata loads
+    audio.addEventListener('loadedmetadata', ()=>{
+      try{ restoreBasics(); }catch{}
+    }, {once:true});
+  })();
+  </script>
+</body>
+</html>
